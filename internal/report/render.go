@@ -2,11 +2,10 @@ package report
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 
+	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/chromedp"
 	"github.com/pkg/errors"
 )
 
@@ -17,57 +16,46 @@ import (
 // --no-sandbox \
 // --disable-gpu \
 // --run-all-compositor-stages-before-draw \
-// --print-to-pdf-no-header \
+// --no-pdf-header-footer \
 // --print-to-pdf=test.pdf \
 // report.html
 
-func findChrome() (string, error) {
-	var chromePath string
-	switch runtime.GOOS {
-	case "windows":
-		chromePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-	case "darwin":
-		chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-	case "linux":
-		var err error
-		for _, name := range []string{"chromium-browser", "google-chrome-stable"} {
-			chromePath, err = exec.LookPath(name)
-			if err == nil {
-				break
+var chromeDPExecAllocatorOptions = append(
+	chromedp.DefaultExecAllocatorOptions[:],
+	chromedp.Flag("no-zygote", true),
+	chromedp.Flag("no-sandbox", true),
+	chromedp.Flag("disable-gpu", true),
+	chromedp.Flag("run-all-compositor-stages-before-draw", true),
+)
+
+func renderToPDF(ctx context.Context, fileToRenderURL string, pathToResultPDF string) error {
+	allocCtx, allocCtxCancel := chromedp.NewExecAllocator(ctx, chromeDPExecAllocatorOptions...)
+	defer allocCtxCancel()
+
+	chromeCtx, chromeCtxCancel := chromedp.NewContext(allocCtx)
+	defer chromeCtxCancel()
+
+	var buf []byte
+
+	tasks := chromedp.Tasks{
+		chromedp.Navigate(fileToRenderURL),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			var err error
+			buf, _, err = page.PrintToPDF().WithPrintBackground(true).Do(ctx)
+			if err != nil {
+				return err
 			}
-		}
+			return nil
+		}),
 	}
 
-	if chromePath == "" {
-		return "", errors.New("chrome not found")
+	if err := chromedp.Run(chromeCtx, tasks); err != nil {
+		return errors.Wrap(err, "couldn't render HTML file to PDF")
 	}
 
-	if _, err := os.Stat(chromePath); errors.Is(err, os.ErrNotExist) {
-		return "", err
+	if err := os.WriteFile(pathToResultPDF, buf, 0o644); err != nil {
+		return errors.Wrap(err, "couldn't save PDF file")
 	}
 
-	return chromePath, nil
-}
-
-func renderToPDF(ctx context.Context, fileToRender string, pathToResultPDF string) error {
-	chromePath, err := findChrome()
-	if err != nil {
-		return errors.Wrap(err, "couldn't find Chrome/Chromium to render HTML file to PDF")
-	}
-
-	cmd := exec.CommandContext(ctx, chromePath,
-		"--headless",
-		"--no-zygote",
-		"--single-process",
-		"--no-sandbox",
-		"--disable-gpu",
-		"--run-all-compositor-stages-before-draw",
-		"--print-to-pdf-no-header",
-		fmt.Sprintf("--print-to-pdf=%s", pathToResultPDF),
-		fileToRender,
-	)
-
-	err = cmd.Run()
-
-	return err
+	return nil
 }

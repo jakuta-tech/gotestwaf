@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/wallarm/gotestwaf/internal/db"
+	"github.com/wallarm/gotestwaf/internal/helpers"
 	"github.com/wallarm/gotestwaf/internal/version"
 	"github.com/wallarm/gotestwaf/pkg/report"
 )
@@ -28,43 +29,50 @@ var (
 	comparisonTable = []*report.ComparisonTableRow{
 		{
 			Name:         "ModSecurity PARANOIA=1",
-			ApiSec:       computeGrade(42.9, 1),
-			AppSec:       computeGrade(30.5, 1),
-			OverallScore: computeGrade(36.7, 1),
+			ApiSec:       computeGrade(42.86, 1),
+			AppSec:       computeGrade(67.57, 1),
+			OverallScore: computeGrade(55.22, 1),
 		},
 		{
 			Name:         "ModSecurity PARANOIA=2",
-			ApiSec:       computeGrade(78.6, 1),
-			AppSec:       computeGrade(34.8, 1),
-			OverallScore: computeGrade(56.7, 1),
+			ApiSec:       computeGrade(57.14, 1),
+			AppSec:       computeGrade(58.94, 1),
+			OverallScore: computeGrade(58.04, 1),
 		},
 		{
 			Name:         "ModSecurity PARANOIA=3",
-			ApiSec:       computeGrade(92.9, 1),
-			AppSec:       computeGrade(38.3, 1),
-			OverallScore: computeGrade(65.6, 1),
+			ApiSec:       computeGrade(85.71, 1),
+			AppSec:       computeGrade(50.86, 1),
+			OverallScore: computeGrade(68.29, 1),
 		},
 		{
 			Name:         "ModSecurity PARANOIA=4",
-			ApiSec:       computeGrade(100, 1),
-			AppSec:       computeGrade(40.8, 1),
-			OverallScore: computeGrade(70.4, 1),
+			ApiSec:       computeGrade(100.00, 1),
+			AppSec:       computeGrade(36.76, 1),
+			OverallScore: computeGrade(68.38, 1),
 		},
+	}
+
+	wallarmResult = &report.ComparisonTableRow{
+		Name:         "Wallarm",
+		ApiSec:       computeGrade(100, 1),
+		AppSec:       computeGrade(97.74, 1),
+		OverallScore: computeGrade(98.87, 1),
 	}
 )
 
-func computeGrade(value float64, all int) *report.Grade {
+func getGrade(grade float64, na bool) *report.Grade {
 	g := &report.Grade{
 		Percentage:     0.0,
 		Mark:           naMark,
 		CSSClassSuffix: "na",
 	}
 
-	if all == 0 {
+	if na {
 		return g
 	}
 
-	g.Percentage = value / float64(all)
+	g.Percentage = grade
 	if g.Percentage <= 1 {
 		g.Percentage *= 100
 	}
@@ -114,6 +122,14 @@ func computeGrade(value float64, all int) *report.Grade {
 	return g
 }
 
+func computeGrade(value float64, all int) *report.Grade {
+	if all == 0 {
+		return getGrade(0.0, true)
+	}
+
+	return getGrade(value/float64(all), false)
+}
+
 // truncatePayload replaces the middle part of the payload if
 // it is longer than maxUntruncatedPayloadLength.
 func truncatePayload(payload string) string {
@@ -151,92 +167,46 @@ func prepareHTMLFullReport(
 		OpenApiFile:      openApiFile,
 		Args:             args,
 		ComparisonTable:  comparisonTable,
+		WallarmResult:    wallarmResult,
 	}
 
-	var apiSecNegBlockedNum int
-	var apiSecNegNum int
-	var appSecNegBlockedNum int
-	var appSecNegNum int
-
-	for _, test := range s.NegativeTests.Blocked {
-		if isApiTest(test.TestSet) {
-			apiSecNegNum++
-			apiSecNegBlockedNum++
-		} else {
-			appSecNegNum++
-			appSecNegBlockedNum++
-		}
-	}
-	for _, test := range s.NegativeTests.Bypasses {
-		if isApiTest(test.TestSet) {
-			apiSecNegNum++
-		} else {
-			appSecNegNum++
-		}
+	if s.Score.ApiSec.TruePositive < 0 {
+		data.ApiSec.TruePositiveTestsGrade = getGrade(0.0, true)
+	} else {
+		data.ApiSec.TruePositiveTestsGrade = getGrade(s.Score.ApiSec.TruePositive, false)
 	}
 
-	var apiSecPosBypassNum int
-	var apiSecPosNum int
-	var appSecPosBypassNum int
-	var appSecPosNum int
-
-	for _, test := range s.PositiveTests.TruePositive {
-		if isApiTest(test.TestSet) {
-			apiSecPosNum++
-			apiSecPosBypassNum++
-		} else {
-			appSecPosNum++
-			appSecPosBypassNum++
-		}
-	}
-	for _, test := range s.PositiveTests.FalsePositive {
-		if isApiTest(test.TestSet) {
-			apiSecPosNum++
-		} else {
-			appSecPosNum++
-		}
+	if s.Score.ApiSec.TrueNegative < 0 {
+		data.ApiSec.TrueNegativeTestsGrade = getGrade(0.0, true)
+	} else {
+		data.ApiSec.TrueNegativeTestsGrade = getGrade(s.Score.ApiSec.TrueNegative, false)
 	}
 
-	divider := 0
-	data.ApiSec.TrueNegative = computeGrade(float64(apiSecNegBlockedNum), apiSecNegNum)
-	data.ApiSec.TruePositive = computeGrade(float64(apiSecPosBypassNum), apiSecPosNum)
-	if data.ApiSec.TrueNegative.Mark != naMark {
-		divider++
+	if s.Score.ApiSec.Average < 0 {
+		data.ApiSec.Grade = getGrade(0.0, true)
+	} else {
+		data.ApiSec.Grade = getGrade(s.Score.ApiSec.Average, false)
 	}
-	if data.ApiSec.TruePositive.Mark != naMark {
-		divider++
-	}
-	data.ApiSec.Grade = computeGrade(
-		data.ApiSec.TrueNegative.Percentage+
-			data.ApiSec.TruePositive.Percentage,
-		divider,
-	)
 
-	divider = 0
+	if s.Score.AppSec.TruePositive < 0 {
+		data.AppSec.TruePositiveTestsGrade = getGrade(0.0, true)
+	} else {
+		data.AppSec.TruePositiveTestsGrade = getGrade(s.Score.AppSec.TruePositive, false)
+	}
 
-	data.AppSec.TrueNegative = computeGrade(float64(appSecNegBlockedNum), appSecNegNum)
-	data.AppSec.TruePositive = computeGrade(float64(appSecPosBypassNum), appSecPosNum)
-	if data.AppSec.TrueNegative.Mark != naMark {
-		divider++
+	if s.Score.AppSec.TrueNegative < 0 {
+		data.AppSec.TrueNegativeTestsGrade = getGrade(0.0, true)
+	} else {
+		data.AppSec.TrueNegativeTestsGrade = getGrade(s.Score.AppSec.TrueNegative, false)
 	}
-	if data.AppSec.TruePositive.Mark != naMark {
-		divider++
-	}
-	data.AppSec.Grade = computeGrade(
-		data.AppSec.TrueNegative.Percentage+
-			data.AppSec.TruePositive.Percentage,
-		divider,
-	)
 
-	divider = 0
-	if data.ApiSec.Grade.Mark != naMark {
-		divider++
+	if s.Score.AppSec.Average < 0 {
+		data.AppSec.Grade = getGrade(0.0, true)
+	} else {
+		data.AppSec.Grade = getGrade(s.Score.AppSec.Average, false)
 	}
-	if data.AppSec.Grade.Mark != naMark {
-		divider++
-	}
-	data.Overall = computeGrade(
-		data.ApiSec.Grade.Percentage+data.AppSec.Grade.Percentage, divider)
+
+	data.Overall = getGrade(s.Score.Average, false)
 
 	apiIndicators, apiItems, appIndicators, appItems := generateChartData(s)
 
@@ -245,13 +215,13 @@ func prepareHTMLFullReport(
 	data.AppSecChartData.Indicators = appIndicators
 	data.AppSecChartData.Items = appItems
 
-	data.NegativeTests.SummaryTable = make(map[string]*report.TestSetSummary)
-	for _, row := range s.NegativeTests.SummaryTable {
-		if _, ok := data.NegativeTests.SummaryTable[row.TestSet]; !ok {
-			data.NegativeTests.SummaryTable[row.TestSet] = &report.TestSetSummary{}
+	data.TruePositiveTests.SummaryTable = make(map[string]*report.TestSetSummary)
+	for _, row := range s.TruePositiveTests.SummaryTable {
+		if _, ok := data.TruePositiveTests.SummaryTable[row.TestSet]; !ok {
+			data.TruePositiveTests.SummaryTable[row.TestSet] = &report.TestSetSummary{}
 		}
 
-		testSetSum := data.NegativeTests.SummaryTable[row.TestSet]
+		testSetSum := data.TruePositiveTests.SummaryTable[row.TestSet]
 
 		testSetSum.TestCases = append(testSetSum.TestCases, row)
 
@@ -266,17 +236,17 @@ func prepareHTMLFullReport(
 			testSetSum.Percentage += row.Percentage
 		}
 	}
-	for _, testSetSum := range data.NegativeTests.SummaryTable {
+	for _, testSetSum := range data.TruePositiveTests.SummaryTable {
 		testSetSum.Percentage = db.Round(testSetSum.Percentage / float64(testSetSum.ResolvedTestCasesNumber))
 	}
 
-	data.PositiveTests.SummaryTable = make(map[string]*report.TestSetSummary)
-	for _, row := range s.PositiveTests.SummaryTable {
-		if _, ok := data.PositiveTests.SummaryTable[row.TestSet]; !ok {
-			data.PositiveTests.SummaryTable[row.TestSet] = &report.TestSetSummary{}
+	data.TrueNegativeTests.SummaryTable = make(map[string]*report.TestSetSummary)
+	for _, row := range s.TrueNegativeTests.SummaryTable {
+		if _, ok := data.TrueNegativeTests.SummaryTable[row.TestSet]; !ok {
+			data.TrueNegativeTests.SummaryTable[row.TestSet] = &report.TestSetSummary{}
 		}
 
-		testSetSum := data.PositiveTests.SummaryTable[row.TestSet]
+		testSetSum := data.TrueNegativeTests.SummaryTable[row.TestSet]
 
 		testSetSum.TestCases = append(testSetSum.TestCases, row)
 
@@ -291,14 +261,14 @@ func prepareHTMLFullReport(
 			testSetSum.Percentage += row.Percentage
 		}
 	}
-	for _, testSetSum := range data.PositiveTests.SummaryTable {
+	for _, testSetSum := range data.TrueNegativeTests.SummaryTable {
 		testSetSum.Percentage = db.Round(testSetSum.Percentage / float64(testSetSum.ResolvedTestCasesNumber))
 	}
 
 	if includePayloads {
 		// map[paths]map[payload]map[statusCode]*testDetails
 		negBypassed := make(map[string]map[string]map[int]*report.TestDetails)
-		for _, d := range s.NegativeTests.Bypasses {
+		for _, d := range s.TruePositiveTests.Bypasses {
 			paths := strings.Join(d.AdditionalInfo, "\n")
 
 			if _, ok := negBypassed[paths]; !ok {
@@ -327,7 +297,7 @@ func prepareHTMLFullReport(
 
 		// map[payload]map[statusCode]*testDetails
 		negUnresolved := make(map[string]map[int]*report.TestDetails)
-		for _, d := range s.NegativeTests.Unresolved {
+		for _, d := range s.TruePositiveTests.Unresolved {
 			payload := truncatePayload(d.Payload)
 
 			if _, ok := negUnresolved[payload]; !ok {
@@ -347,13 +317,13 @@ func prepareHTMLFullReport(
 			negUnresolved[payload][d.ResponseStatusCode].Placeholders[d.Placeholder] = nil
 		}
 
-		data.NegativeTests.Bypassed = negBypassed
-		data.NegativeTests.Unresolved = negUnresolved
-		data.NegativeTests.Failed = s.NegativeTests.Failed
+		data.TruePositiveTests.Bypassed = negBypassed
+		data.TruePositiveTests.Unresolved = negUnresolved
+		data.TruePositiveTests.Failed = s.TruePositiveTests.Failed
 
 		// map[payload]map[statusCode]*testDetails
 		posBlocked := make(map[string]map[int]*report.TestDetails)
-		for _, d := range s.PositiveTests.FalsePositive {
+		for _, d := range s.TrueNegativeTests.Blocked {
 			payload := truncatePayload(d.Payload)
 
 			if _, ok := posBlocked[payload]; !ok {
@@ -375,7 +345,7 @@ func prepareHTMLFullReport(
 
 		// map[payload]map[statusCode]*testDetails
 		posBypassed := make(map[string]map[int]*report.TestDetails)
-		for _, d := range s.PositiveTests.TruePositive {
+		for _, d := range s.TrueNegativeTests.Bypasses {
 			payload := truncatePayload(d.Payload)
 
 			if _, ok := posBypassed[payload]; !ok {
@@ -397,7 +367,7 @@ func prepareHTMLFullReport(
 
 		// map[payload]map[statusCode]*testDetails
 		posUnresolved := make(map[string]map[int]*report.TestDetails)
-		for _, d := range s.PositiveTests.Unresolved {
+		for _, d := range s.TrueNegativeTests.Unresolved {
 			payload := truncatePayload(d.Payload)
 
 			if _, ok := posUnresolved[payload]; !ok {
@@ -417,33 +387,33 @@ func prepareHTMLFullReport(
 			posUnresolved[payload][d.ResponseStatusCode].Placeholders[d.Placeholder] = nil
 		}
 
-		data.PositiveTests.Blocked = posBlocked
-		data.PositiveTests.Bypassed = posBypassed
-		data.PositiveTests.Unresolved = posUnresolved
-		data.PositiveTests.Failed = s.PositiveTests.Failed
+		data.TrueNegativeTests.Blocked = posBlocked
+		data.TrueNegativeTests.Bypassed = posBypassed
+		data.TrueNegativeTests.Unresolved = posUnresolved
+		data.TrueNegativeTests.Failed = s.TrueNegativeTests.Failed
 	}
 
 	data.ScannedPaths = s.Paths
 
-	data.NegativeTests.Percentage = s.NegativeTests.ResolvedBlockedRequestsPercentage
-	data.NegativeTests.TotalSent = s.NegativeTests.AllRequestsNumber
-	data.NegativeTests.BlockedRequestsNumber = s.NegativeTests.BlockedRequestsNumber
-	data.NegativeTests.BypassedRequestsNumber = s.NegativeTests.BypassedRequestsNumber
-	data.NegativeTests.UnresolvedRequestsNumber = s.NegativeTests.UnresolvedRequestsNumber
-	data.NegativeTests.FailedRequestsNumber = s.NegativeTests.FailedRequestsNumber
+	data.TruePositiveTests.Percentage = s.TruePositiveTests.ResolvedBlockedRequestsPercentage
+	data.TruePositiveTests.TotalSent = s.TruePositiveTests.ReqStats.AllRequestsNumber
+	data.TruePositiveTests.BlockedRequestsNumber = s.TruePositiveTests.ReqStats.BlockedRequestsNumber
+	data.TruePositiveTests.BypassedRequestsNumber = s.TruePositiveTests.ReqStats.BypassedRequestsNumber
+	data.TruePositiveTests.UnresolvedRequestsNumber = s.TruePositiveTests.ReqStats.UnresolvedRequestsNumber
+	data.TruePositiveTests.FailedRequestsNumber = s.TruePositiveTests.ReqStats.FailedRequestsNumber
 
-	data.PositiveTests.Percentage = s.PositiveTests.ResolvedTrueRequestsPercentage
-	data.PositiveTests.TotalSent = s.PositiveTests.AllRequestsNumber
-	data.PositiveTests.BlockedRequestsNumber = s.PositiveTests.BlockedRequestsNumber
-	data.PositiveTests.BypassedRequestsNumber = s.PositiveTests.BypassedRequestsNumber
-	data.PositiveTests.UnresolvedRequestsNumber = s.PositiveTests.UnresolvedRequestsNumber
-	data.PositiveTests.FailedRequestsNumber = s.PositiveTests.FailedRequestsNumber
+	data.TrueNegativeTests.Percentage = s.TrueNegativeTests.ResolvedBypassedRequestsPercentage
+	data.TrueNegativeTests.TotalSent = s.TrueNegativeTests.ReqStats.AllRequestsNumber
+	data.TrueNegativeTests.BlockedRequestsNumber = s.TrueNegativeTests.ReqStats.BlockedRequestsNumber
+	data.TrueNegativeTests.BypassedRequestsNumber = s.TrueNegativeTests.ReqStats.BypassedRequestsNumber
+	data.TrueNegativeTests.UnresolvedRequestsNumber = s.TrueNegativeTests.ReqStats.UnresolvedRequestsNumber
+	data.TrueNegativeTests.FailedRequestsNumber = s.TrueNegativeTests.ReqStats.FailedRequestsNumber
 
-	data.TotalSent = data.NegativeTests.TotalSent + data.PositiveTests.TotalSent
-	data.BlockedRequestsNumber = data.NegativeTests.BlockedRequestsNumber + data.PositiveTests.BlockedRequestsNumber
-	data.BypassedRequestsNumber = data.NegativeTests.BypassedRequestsNumber + data.PositiveTests.BypassedRequestsNumber
-	data.UnresolvedRequestsNumber = data.NegativeTests.UnresolvedRequestsNumber + data.PositiveTests.UnresolvedRequestsNumber
-	data.FailedRequestsNumber = data.NegativeTests.FailedRequestsNumber + data.PositiveTests.FailedRequestsNumber
+	data.TotalSent = data.TruePositiveTests.TotalSent + data.TrueNegativeTests.TotalSent
+	data.BlockedRequestsNumber = data.TruePositiveTests.BlockedRequestsNumber + data.TrueNegativeTests.BlockedRequestsNumber
+	data.BypassedRequestsNumber = data.TruePositiveTests.BypassedRequestsNumber + data.TrueNegativeTests.BypassedRequestsNumber
+	data.UnresolvedRequestsNumber = data.TruePositiveTests.UnresolvedRequestsNumber + data.TrueNegativeTests.UnresolvedRequestsNumber
+	data.FailedRequestsNumber = data.TruePositiveTests.FailedRequestsNumber + data.TrueNegativeTests.FailedRequestsNumber
 
 	return data, nil
 }
@@ -508,7 +478,7 @@ func printFullReportToHtml(
 		return errors.Wrap(err, "couldn't export report to HTML")
 	}
 
-	err = os.Rename(tempFileName, reportFile)
+	err = helpers.FileMove(tempFileName, reportFile)
 	if err != nil {
 		return errors.Wrap(err, "couldn't export report to HTML")
 	}

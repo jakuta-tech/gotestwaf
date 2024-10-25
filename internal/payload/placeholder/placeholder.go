@@ -1,39 +1,95 @@
 package placeholder
 
 import (
-	"net/http"
+	"github.com/pkg/errors"
+
+	"github.com/wallarm/gotestwaf/internal/helpers"
+	"github.com/wallarm/gotestwaf/internal/scanner/types"
 )
 
-const Seed = 5
+const (
+	Seed = 5
+
+	payloadPlaceholder = "{{payload}}"
+)
 
 type Placeholder interface {
+	NewPlaceholderConfig(conf map[any]any) (PlaceholderConfig, error)
+
 	GetName() string
-	CreateRequest(url, data string) (*http.Request, error)
+	CreateRequest(
+		requestURL, payload string,
+		config PlaceholderConfig,
+		httpClientType types.HTTPClientType,
+	) (types.Request, error)
+}
+
+type PlaceholderConfig interface {
+	helpers.Hash
 }
 
 var Placeholders map[string]Placeholder
 
-func init() {
-	Placeholders = make(map[string]Placeholder)
-	Placeholders[DefaultGRPC.GetName()] = DefaultGRPC
-	Placeholders[DefaultHeader.GetName()] = DefaultHeader
-	Placeholders[DefaultHTMLForm.GetName()] = DefaultHTMLForm
-	Placeholders[DefaultHTMLMultipartForm.GetName()] = DefaultHTMLMultipartForm
-	Placeholders[DefaultJSONBody.GetName()] = DefaultJSONBody
-	Placeholders[DefaultJSONRequest.GetName()] = DefaultJSONRequest
-	Placeholders[DefaultRequestBody.GetName()] = DefaultRequestBody
-	Placeholders[DefaultSOAPBody.GetName()] = DefaultSOAPBody
-	Placeholders[DefaultURLParam.GetName()] = DefaultURLParam
-	Placeholders[DefaultURLPath.GetName()] = DefaultURLPath
-	Placeholders[DefaultXMLBody.GetName()] = DefaultXMLBody
-	Placeholders[DefaultNonCrudUrlPath.GetName()] = DefaultNonCrudUrlPath
-	Placeholders[DefaultNonCrudUrlParam.GetName()] = DefaultNonCrudUrlParam
-	Placeholders[DefaultNonCRUDHeader.GetName()] = DefaultNonCRUDHeader
-	Placeholders[DefaultNonCRUDRequestBody.GetName()] = DefaultNonCRUDRequestBody
+var placeholders = []Placeholder{
+	DefaultGraphQL,
+	DefaultGRPC,
+	DefaultHeader,
+	DefaultHTMLForm,
+	DefaultHTMLMultipartForm,
+	DefaultJSONBody,
+	DefaultJSONRequest,
+	DefaultRawRequest,
+	DefaultRequestBody,
+	DefaultSOAPBody,
+	DefaultURLParam,
+	DefaultURLPath,
+	DefaultUserAgent,
+	DefaultXMLBody,
 }
 
-func Apply(host, placeholder, data string) (*http.Request, error) {
-	req, err := Placeholders[placeholder].CreateRequest(host, data)
+func init() {
+	Placeholders = make(map[string]Placeholder)
+	for _, placeholder := range placeholders {
+		Placeholders[placeholder.GetName()] = placeholder
+	}
+}
+
+func GetPlaceholderConfig(name string, conf any) (PlaceholderConfig, error) {
+	ph, ok := Placeholders[name]
+	if !ok {
+		return nil, &UnknownPlaceholderError{name: name}
+	}
+
+	phConfMap, ok := conf.(map[any]any)
+	if !ok {
+		return nil, &BadPlaceholderConfigError{
+			name: name,
+			err:  errors.Errorf("bad placeholder config, expected: map[any]any, got: %T", conf),
+		}
+	}
+
+	phConf, err := ph.NewPlaceholderConfig(phConfMap)
+	if err != nil {
+		return nil, &BadPlaceholderConfigError{
+			name: name,
+			err:  err,
+		}
+	}
+
+	return phConf, err
+}
+
+func Apply(
+	url, data, placeholder string,
+	config PlaceholderConfig,
+	httpClientType types.HTTPClientType,
+) (types.Request, error) {
+	ph, ok := Placeholders[placeholder]
+	if !ok {
+		return nil, &UnknownPlaceholderError{name: placeholder}
+	}
+
+	req, err := ph.CreateRequest(url, data, config, httpClientType)
 	if err != nil {
 		return nil, err
 	}

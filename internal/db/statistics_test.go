@@ -165,30 +165,30 @@ func testPropertyNotPanics(db *DB, ignoreUnresolved, nonBlockedAsPassed bool) bo
 func testPropertyOnlyPositiveNumberValues(db *DB, ignoreUnresolved, nonBlockedAsPassed bool) bool {
 	stat := db.GetStatistics(ignoreUnresolved, nonBlockedAsPassed)
 
-	if stat.NegativeTests.AllRequestsNumber < 0 ||
-		stat.NegativeTests.BlockedRequestsNumber < 0 ||
-		stat.NegativeTests.BypassedRequestsNumber < 0 ||
-		stat.NegativeTests.UnresolvedRequestsNumber < 0 ||
-		stat.NegativeTests.FailedRequestsNumber < 0 ||
-		stat.NegativeTests.ResolvedRequestsNumber < 0 ||
-		stat.NegativeTests.UnresolvedRequestsPercentage < 0 ||
-		stat.NegativeTests.ResolvedBlockedRequestsPercentage < 0 ||
-		stat.NegativeTests.ResolvedBypassedRequestsPercentage < 0 ||
-		stat.NegativeTests.FailedRequestsPercentage < 0 ||
-		stat.PositiveTests.AllRequestsNumber < 0 ||
-		stat.PositiveTests.BlockedRequestsNumber < 0 ||
-		stat.PositiveTests.BypassedRequestsNumber < 0 ||
-		stat.PositiveTests.UnresolvedRequestsNumber < 0 ||
-		stat.PositiveTests.FailedRequestsNumber < 0 ||
-		stat.PositiveTests.ResolvedRequestsNumber < 0 ||
-		stat.PositiveTests.UnresolvedRequestsPercentage < 0 ||
-		stat.PositiveTests.ResolvedFalseRequestsPercentage < 0 ||
-		stat.PositiveTests.ResolvedTrueRequestsPercentage < 0 ||
-		stat.PositiveTests.FailedRequestsPercentage < 0 {
+	if stat.TruePositiveTests.ReqStats.AllRequestsNumber < 0 ||
+		stat.TruePositiveTests.ReqStats.BlockedRequestsNumber < 0 ||
+		stat.TruePositiveTests.ReqStats.BypassedRequestsNumber < 0 ||
+		stat.TruePositiveTests.ReqStats.UnresolvedRequestsNumber < 0 ||
+		stat.TruePositiveTests.ReqStats.FailedRequestsNumber < 0 ||
+		stat.TruePositiveTests.ReqStats.ResolvedRequestsNumber < 0 ||
+		stat.TruePositiveTests.UnresolvedRequestsPercentage < 0 ||
+		stat.TruePositiveTests.ResolvedBlockedRequestsPercentage < 0 ||
+		stat.TruePositiveTests.ResolvedBypassedRequestsPercentage < 0 ||
+		stat.TruePositiveTests.FailedRequestsPercentage < 0 ||
+		stat.TrueNegativeTests.ReqStats.AllRequestsNumber < 0 ||
+		stat.TrueNegativeTests.ReqStats.BlockedRequestsNumber < 0 ||
+		stat.TrueNegativeTests.ReqStats.BypassedRequestsNumber < 0 ||
+		stat.TrueNegativeTests.ReqStats.UnresolvedRequestsNumber < 0 ||
+		stat.TrueNegativeTests.ReqStats.FailedRequestsNumber < 0 ||
+		stat.TrueNegativeTests.ReqStats.ResolvedRequestsNumber < 0 ||
+		stat.TrueNegativeTests.UnresolvedRequestsPercentage < 0 ||
+		stat.TrueNegativeTests.ResolvedBlockedRequestsPercentage < 0 ||
+		stat.TrueNegativeTests.ResolvedBypassedRequestsPercentage < 0 ||
+		stat.TrueNegativeTests.FailedRequestsPercentage < 0 {
 		return false
 	}
 
-	summaryTablesRows := append(stat.NegativeTests.SummaryTable, stat.PositiveTests.SummaryTable...)
+	summaryTablesRows := append(stat.TruePositiveTests.SummaryTable, stat.TrueNegativeTests.SummaryTable...)
 	for _, row := range summaryTablesRows {
 		if row.Percentage < 0 ||
 			row.Sent < 0 ||
@@ -207,56 +207,56 @@ func testPropertyCorrectStatValues(db *DB, ignoreUnresolved, nonBlockedAsPassed 
 	stat := db.GetStatistics(ignoreUnresolved, nonBlockedAsPassed)
 
 	counters := make(map[string]map[string]int)
-	counters["negative"] = make(map[string]int)
-	counters["positive"] = make(map[string]int)
+	counters["true-positive"] = make(map[string]int)
+	counters["true-negative"] = make(map[string]int)
 
-	for _, row := range stat.NegativeTests.SummaryTable {
-		counters["negative"]["sent"] += row.Sent
-		counters["negative"]["blocked"] += row.Blocked
-		counters["negative"]["bypassed"] += row.Bypassed
-		counters["negative"]["unresolved"] += row.Unresolved
-		counters["negative"]["failed"] += row.Failed
+	for _, row := range stat.TruePositiveTests.SummaryTable {
+		counters["true-positive"]["sent"] += row.Sent
+		counters["true-positive"]["blocked"] += row.Blocked
+		counters["true-positive"]["bypassed"] += row.Bypassed
+		counters["true-positive"]["unresolved"] += row.Unresolved
+		counters["true-positive"]["failed"] += row.Failed
 	}
 
-	counters["negative"]["all"] = counters["negative"]["blocked"] +
-		counters["negative"]["bypassed"] +
-		counters["negative"]["unresolved"] +
-		counters["negative"]["failed"]
+	counters["true-positive"]["all"] = counters["true-positive"]["blocked"] +
+		counters["true-positive"]["bypassed"] +
+		counters["true-positive"]["unresolved"] +
+		counters["true-positive"]["failed"]
 
-	counters["negative"]["resolved"] = counters["negative"]["blocked"] +
-		counters["negative"]["bypassed"]
+	counters["true-positive"]["resolved"] = counters["true-positive"]["blocked"] +
+		counters["true-positive"]["bypassed"]
 
-	if counters["negative"]["all"] != stat.NegativeTests.AllRequestsNumber ||
-		counters["negative"]["blocked"] != stat.NegativeTests.BlockedRequestsNumber ||
-		counters["negative"]["bypassed"] != stat.NegativeTests.BypassedRequestsNumber ||
-		counters["negative"]["unresolved"] != stat.NegativeTests.UnresolvedRequestsNumber ||
-		counters["negative"]["failed"] != stat.NegativeTests.FailedRequestsNumber ||
-		counters["negative"]["resolved"] != stat.NegativeTests.ResolvedRequestsNumber {
+	if counters["true-positive"]["all"] != stat.TruePositiveTests.ReqStats.AllRequestsNumber ||
+		counters["true-positive"]["blocked"] != stat.TruePositiveTests.ReqStats.BlockedRequestsNumber ||
+		counters["true-positive"]["bypassed"] != stat.TruePositiveTests.ReqStats.BypassedRequestsNumber ||
+		counters["true-positive"]["unresolved"] != stat.TruePositiveTests.ReqStats.UnresolvedRequestsNumber ||
+		counters["true-positive"]["failed"] != stat.TruePositiveTests.ReqStats.FailedRequestsNumber ||
+		counters["true-positive"]["resolved"] != stat.TruePositiveTests.ReqStats.ResolvedRequestsNumber {
 		return false
 	}
 
-	for _, row := range stat.PositiveTests.SummaryTable {
-		counters["positive"]["sent"] += row.Sent
-		counters["positive"]["blocked"] += row.Blocked
-		counters["positive"]["bypassed"] += row.Bypassed
-		counters["positive"]["unresolved"] += row.Unresolved
-		counters["positive"]["failed"] += row.Failed
+	for _, row := range stat.TrueNegativeTests.SummaryTable {
+		counters["true-negative"]["sent"] += row.Sent
+		counters["true-negative"]["blocked"] += row.Blocked
+		counters["true-negative"]["bypassed"] += row.Bypassed
+		counters["true-negative"]["unresolved"] += row.Unresolved
+		counters["true-negative"]["failed"] += row.Failed
 	}
 
-	counters["positive"]["all"] = counters["positive"]["blocked"] +
-		counters["positive"]["bypassed"] +
-		counters["positive"]["unresolved"] +
-		counters["positive"]["failed"]
+	counters["true-negative"]["all"] = counters["true-negative"]["blocked"] +
+		counters["true-negative"]["bypassed"] +
+		counters["true-negative"]["unresolved"] +
+		counters["true-negative"]["failed"]
 
-	counters["positive"]["resolved"] = counters["positive"]["blocked"] +
-		counters["positive"]["bypassed"]
+	counters["true-negative"]["resolved"] = counters["true-negative"]["blocked"] +
+		counters["true-negative"]["bypassed"]
 
-	if counters["positive"]["all"] != stat.PositiveTests.AllRequestsNumber ||
-		counters["positive"]["blocked"] != stat.PositiveTests.BlockedRequestsNumber ||
-		counters["positive"]["bypassed"] != stat.PositiveTests.BypassedRequestsNumber ||
-		counters["positive"]["unresolved"] != stat.PositiveTests.UnresolvedRequestsNumber ||
-		counters["positive"]["failed"] != stat.PositiveTests.FailedRequestsNumber ||
-		counters["positive"]["resolved"] != stat.PositiveTests.ResolvedRequestsNumber {
+	if counters["true-negative"]["all"] != stat.TrueNegativeTests.ReqStats.AllRequestsNumber ||
+		counters["true-negative"]["blocked"] != stat.TrueNegativeTests.ReqStats.BlockedRequestsNumber ||
+		counters["true-negative"]["bypassed"] != stat.TrueNegativeTests.ReqStats.BypassedRequestsNumber ||
+		counters["true-negative"]["unresolved"] != stat.TrueNegativeTests.ReqStats.UnresolvedRequestsNumber ||
+		counters["true-negative"]["failed"] != stat.TrueNegativeTests.ReqStats.FailedRequestsNumber ||
+		counters["true-negative"]["resolved"] != stat.TrueNegativeTests.ReqStats.ResolvedRequestsNumber {
 		return false
 	}
 
@@ -335,7 +335,7 @@ func NewDBAllUnresolvedGenerator(ignoreUnresolved, nonBlockedAsPassed bool) gopt
 				if db.counters[t.Set][t.Case] == nil {
 					db.counters[t.Set][t.Case] = make(map[string]int)
 				}
-				if (ignoreUnresolved || nonBlockedAsPassed) && !isPositiveTest(t.Set) {
+				if (ignoreUnresolved || nonBlockedAsPassed) && !isFalsePositiveTest(t.Set) {
 					db.counters[t.Set][t.Case]["passed"]++
 				} else {
 					db.counters[t.Set][t.Case]["blocked"]++
@@ -428,7 +428,7 @@ func NewDBGenerator(ignoreUnresolved, nonBlockedAsPassed bool) gopter.Gen {
 				if db.counters[t.Set][t.Case] == nil {
 					db.counters[t.Set][t.Case] = make(map[string]int)
 				}
-				if (ignoreUnresolved || nonBlockedAsPassed) && !isPositiveTest(t.Set) {
+				if (ignoreUnresolved || nonBlockedAsPassed) && !isFalsePositiveTest(t.Set) {
 					db.counters[t.Set][t.Case]["passed"]++
 				} else {
 					db.counters[t.Set][t.Case]["blocked"]++
@@ -487,5 +487,166 @@ func GenInfoSlice() gopter.Gen {
 func BoolGenerator(b bool) gopter.Gen {
 	return func(parameters *gopter.GenParameters) *gopter.GenResult {
 		return gopter.NewGenResult(b, gopter.NoShrinker)
+	}
+}
+
+func TestStatisticsCalculation(t *testing.T) {
+	testCases := []struct {
+		apiSecTruePosBypassesNum int
+		apiSecTruePosBlockedNum  int
+
+		apiSecTrueNegBypassesNum int
+		apiSecTrueNegBlockedNum  int
+
+		appSecTruePosBypassesNum int
+		appSecTruePosBlockedNum  int
+
+		appSecTrueNegBypassesNum int
+		appSecTrueNegBlockedNum  int
+	}{
+		{0, 0, 0, 0, 0, 0, 0, 0},
+		{rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1, rand.Int()%500 + 1},
+		{rand.Int()%500 + 1, 0, 0, 0, 0, 0, 0, 0},
+		{0, rand.Int()%500 + 1, 0, 0, 0, 0, 0, 0},
+		{rand.Int()%500 + 1, rand.Int()%500 + 1, 0, 0, 0, 0, 0, 0},
+		{0, 0, rand.Int()%500 + 1, 0, 0, 0, 0, 0},
+		{0, 0, 0, rand.Int()%500 + 1, 0, 0, 0, 0},
+		{0, 0, rand.Int()%500 + 1, rand.Int()%500 + 1, 0, 0, 0, 0},
+		{0, 0, 0, 0, rand.Int()%500 + 1, 0, 0, 0},
+		{0, 0, 0, 0, 0, rand.Int()%500 + 1, 0, 0},
+		{0, 0, 0, 0, rand.Int()%500 + 1, rand.Int()%500 + 1, 0, 0},
+		{0, 0, 0, 0, 0, 0, rand.Int()%500 + 1, 0},
+		{0, 0, 0, 0, 0, 0, 0, rand.Int()%500 + 1},
+		{0, 0, 0, 0, 0, 0, rand.Int()%500 + 1, rand.Int()%500 + 1},
+	}
+
+	cases := []*Case{
+		{Set: ""},
+		{Set: "false"},
+		{Set: "api"},
+		{Set: "api-false"},
+	}
+
+	for _, tc := range testCases {
+		db, err := NewDB(cases)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := 0; i < tc.apiSecTruePosBypassesNum; i++ {
+			db.UpdatePassedTests(&Info{Set: "api"})
+		}
+		for i := 0; i < tc.apiSecTruePosBlockedNum; i++ {
+			db.UpdateBlockedTests(&Info{Set: "api"})
+		}
+
+		for i := 0; i < tc.apiSecTrueNegBypassesNum; i++ {
+			db.UpdatePassedTests(&Info{Set: "api-false"})
+		}
+		for i := 0; i < tc.apiSecTrueNegBlockedNum; i++ {
+			db.UpdateBlockedTests(&Info{Set: "api-false"})
+		}
+
+		for i := 0; i < tc.appSecTruePosBypassesNum; i++ {
+			db.UpdatePassedTests(&Info{})
+		}
+		for i := 0; i < tc.appSecTruePosBlockedNum; i++ {
+			db.UpdateBlockedTests(&Info{})
+		}
+
+		for i := 0; i < tc.appSecTrueNegBypassesNum; i++ {
+			db.UpdatePassedTests(&Info{Set: "false"})
+		}
+		for i := 0; i < tc.appSecTrueNegBlockedNum; i++ {
+			db.UpdateBlockedTests(&Info{Set: "false"})
+		}
+
+		stat := db.GetStatistics(false, false)
+
+		sum := 0.0
+		div := 0
+
+		apiSecTruePosNum := tc.apiSecTruePosBypassesNum + tc.apiSecTruePosBlockedNum
+		apiSecTruePosPercentage := CalculatePercentage(tc.apiSecTruePosBlockedNum, apiSecTruePosNum)
+		if apiSecTruePosNum == 0 {
+			apiSecTruePosPercentage = -1.0
+		} else {
+			div++
+			sum += apiSecTruePosPercentage
+		}
+
+		apiSecTrueNegNum := tc.apiSecTrueNegBypassesNum + tc.apiSecTrueNegBlockedNum
+		apiSecTrueNegPercentage := CalculatePercentage(tc.apiSecTrueNegBypassesNum, apiSecTrueNegNum)
+		if apiSecTrueNegNum == 0 {
+			apiSecTrueNegPercentage = -1.0
+		} else {
+			div++
+			sum += apiSecTrueNegPercentage
+		}
+
+		apiSecAverage := 0.0
+		if div == 0 {
+			apiSecAverage = -1.0
+		} else {
+			if tc.apiSecTruePosBlockedNum != 0 {
+				apiSecAverage = Round(sum / float64(div))
+			}
+		}
+
+		fmt.Println(tc)
+
+		if stat.Score.ApiSec.TruePositive != apiSecTruePosPercentage {
+			t.Fatalf("ApiSec.TruePositive: want %#v, got %#v", apiSecTruePosPercentage, stat.Score.ApiSec.TruePositive)
+		}
+
+		if stat.Score.ApiSec.TrueNegative != apiSecTrueNegPercentage {
+			t.Fatalf("ApiSec.TrueNegative: want %#v, got %#v", apiSecTrueNegPercentage, stat.Score.ApiSec.TrueNegative)
+		}
+
+		if stat.Score.ApiSec.Average != apiSecAverage {
+			t.Fatalf("ApiSec.Average: want %#v, got %#v", apiSecAverage, stat.Score.ApiSec.Average)
+		}
+
+		sum = 0.0
+		div = 0
+
+		appSecTruePosNum := tc.appSecTruePosBypassesNum + tc.appSecTruePosBlockedNum
+		appSecTruePosPercentage := CalculatePercentage(tc.appSecTruePosBlockedNum, appSecTruePosNum)
+		if appSecTruePosNum == 0 {
+			appSecTruePosPercentage = -1.0
+		} else {
+			div++
+			sum += appSecTruePosPercentage
+		}
+
+		appSecTrueNegNum := tc.appSecTrueNegBypassesNum + tc.appSecTrueNegBlockedNum
+		appSecTrueNegPercentage := CalculatePercentage(tc.appSecTrueNegBypassesNum, appSecTrueNegNum)
+		if appSecTrueNegNum == 0 {
+			appSecTrueNegPercentage = -1.0
+		} else {
+			div++
+			sum += appSecTrueNegPercentage
+		}
+
+		appSecAverage := 0.0
+		if div == 0 {
+			appSecAverage = -1.0
+		} else {
+			if tc.appSecTruePosBlockedNum != 0 {
+				appSecAverage = Round(sum / float64(div))
+			}
+		}
+
+		if stat.Score.AppSec.TruePositive != appSecTruePosPercentage {
+			t.Fatalf("AppSec.TruePositive: want %#v, got %#v", appSecTruePosPercentage, stat.Score.AppSec.TruePositive)
+		}
+
+		if stat.Score.AppSec.TrueNegative != appSecTrueNegPercentage {
+			t.Fatalf("AppSec.TrueNegative: want %#v, got %#v", appSecTrueNegPercentage, stat.Score.AppSec.TrueNegative)
+		}
+
+		if stat.Score.AppSec.Average != appSecAverage {
+			t.Fatalf("AppSec.Average: want %#v, got %#v", appSecAverage, stat.Score.AppSec.Average)
+		}
 	}
 }
