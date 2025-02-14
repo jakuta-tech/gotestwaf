@@ -1,4 +1,3 @@
----
 payload:
   - "\r\nV100 CAPABILITY\r\nV101 FETCH 4791"
   - "\r\nQUIT\r\n"
@@ -11,5 +10,4 @@ placeholder:
   - URLParam
   - HTMLForm
   - HTMLMultipartForm
-type: "Mail Injection"
-...
+type: Mail Injection

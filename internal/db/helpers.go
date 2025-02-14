@@ -39,10 +39,18 @@ func CalculatePercentage[A Number, B Number](first A, second B) float64 {
 	return Round(result)
 }
 
-func isPositiveTest(setName string) bool {
+func isFalsePositiveTest(setName string) bool {
 	return strings.Contains(setName, "false")
 }
 
 func isApiTest(setName string) bool {
 	return strings.Contains(setName, "api")
+}
+
+func mapToString(m map[any]any) string {
+	for k := range m {
+		return k.(string)
+	}
+
+	return ""
 }
